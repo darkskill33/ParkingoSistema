@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Available Parking Spots</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            height: 100vh;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #666;
+        }
+
+        button, a {
+            padding: 12px 20px;
+            margin: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover, a:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            width: 80%;
+            margin: 20px 0;
+            border-collapse: collapse;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr td {
+            text-transform: capitalize;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>Available Parking Locations and Spots</h2>
+
+    {% for location in locations %}
+        <div style="width: 80%; background-color: white; margin-bottom: 20px; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+            <h3>{{ location.name }}</h3>
+            <p>{{ location.address }}</p>
+            
+            <table>
+                <tr>
+                    <th>Spot Number</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+                {% for spot in location.spots.all %}
+                <tr>
+                    <td>{{ spot.spot_number }}</td>
+                    <td>
+                        {% if spot.is_reserved %}
+                            Reserved
+                        {% else %}
+                            Available
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not spot.is_reserved %}
+                            <!-- Pass the spot_id in the URL -->
+                            <a href="{% url 'reserve_parking_spot' spot.id %}">Reserve</a>
+                        {% else %}
+                            Unavailable
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endfor %}
+
+    <button><a href="{% url 'profile' %}">Back to Profile</a></button>
+
+</body>
+</html>

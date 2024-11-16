@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        h3 {
+            color: #4CAF50;
+        }
+
+        h4 {
+            color: #666;
+        }
+
+        button, a {
+            padding: 12px 20px;
+            margin: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover, a:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            width: 80%;
+            margin: 20px 0;
+            border-collapse: collapse;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        p {
+            font-size: 16px;
+            color: #666;
+        }
+
+    </style>
+</head>
+<body>
+    <h2>Welcome to the Parking System!</h2>
+    <h3>Hello, {{ name }}! This is your profile!</h3>
+    {% if messages %}
+        <ul class="success">
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <h3>Your Reserved Parking Spots</h3>
+    
+    {% if reservations %}
+        <table>
+            <tr>
+                <th>Spot Number</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Actions</th>
+            </tr>
+            {% for reservation in reservations %}
+            <tr>
+                <td>{{ reservation.spot.spot_number }}</td>
+                <td>{{ reservation.start_time|date:"Y-m-d H:i" }}</td>
+                <td>{{ reservation.end_time|date:"Y-m-d H:i" }}</td>
+                <td>
+                    <!-- Button for cancelling reservation -->
+                    <form method="POST" action="{% url 'unreserve_parking_spot' reservation.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Cancel Reservation</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>You have no current reservations.</p>
+    {% endif %}
+
+    <button><a href="{% url 'parking_spots' %}">View Available Parking Spots</a></button>
+
+    <br><br>
+    <button type="button" class="btn btn-dark"><a href="{% url 'logout' %}">Logout</a></button>
+</body>
+
+</html>
