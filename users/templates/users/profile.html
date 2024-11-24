@@ -5,47 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile</title>
     <style>
+        /* General Body Styling */
         body {
             font-family: Arial, sans-serif;
             background-color: #f2f2f2;
             margin: 0;
             padding: 0;
+            text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            text-align: center;
+            min-height: 100vh;
+            padding-top: 30px;
         }
 
+        /* Header Styling */
         h2 {
             color: #333;
+            font-size: 2rem;
+            margin-bottom: 20px;
         }
 
         h3 {
             color: #4CAF50;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
         }
 
         h4 {
             color: #666;
         }
 
-        button, a {
-            padding: 12px 20px;
-            margin: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            text-decoration: none;
+        /* Success Message Styling */
+        .success {
+            list-style-type: none;
+            padding: 0;
+            margin: 20px 0;
+            color: green;
+        }
+
+        .success li {
             font-size: 16px;
-            cursor: pointer;
+            margin: 5px 0;
         }
 
-        button:hover, a:hover {
-            background-color: #45a049;
-        }
-
+        /* Table Styling */
         table {
             width: 80%;
             margin: 20px 0;
@@ -57,7 +61,7 @@
         }
 
         th, td {
-            padding: 10px;
+            padding: 12px;
             text-align: center;
             border: 1px solid #ddd;
         }
@@ -71,16 +75,100 @@
             background-color: #f9f9f9;
         }
 
+        /* Buttons Styling */
+        button, a {
+            padding: 12px 20px;
+            margin: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover, a:hover {
+            background-color: #45a049;
+        }
+
+        .btn-dark {
+            background-color: #333;
+        }
+
+        .btn-dark:hover {
+            background-color: #444;
+        }
+
         p {
             font-size: 16px;
             color: #666;
         }
 
+        /* Logout Button Fix: Extend green color */
+        .btn-logout {
+            display: inline-block;
+            width: 15%;
+            text-align: center;
+            background-color: #4CAF50;
+            padding: 4px 0;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-logout a {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 6px 0;
+        }
+
+        /* Responsive Design for smaller screens */
+        @media screen and (max-width: 768px) {
+            body {
+                padding-top: 20px;
+            }
+
+            table {
+                width: 95%;
+                margin: 10px 0;
+            }
+
+            h2 {
+                font-size: 1.8rem;
+            }
+
+            h3 {
+                font-size: 1.3rem;
+            }
+
+            h4 {
+                font-size: 1rem;
+            }
+
+            button, a {
+                font-size: 14px;
+            }
+
+            /* Adjust the buttons' size and layout */
+            .success li {
+                font-size: 14px;
+            }
+
+            .btn-dark {
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
     <h2>Welcome to the Parking System!</h2>
-    <h3>Hello, {{ name }}! This is your profile!</h3>
+    <h3>Hello, {{ user }}! This is your profile!</h3>
+
     {% if messages %}
         <ul class="success">
             {% for message in messages %}
@@ -91,25 +179,37 @@
 
     <h3>Your Reserved Parking Spots</h3>
     
-    {% if reservations %}
+    {% if current_reservations %}
         <table>
             <tr>
                 <th>Spot Number</th>
                 <th>Start Time</th>
                 <th>End Time</th>
+                <th>Daily Price (€)</th>
                 <th>Actions</th>
+                <th>Payment</th>
             </tr>
-            {% for reservation in reservations %}
+            {% for reservation in current_reservations %}
             <tr>
                 <td>{{ reservation.spot.spot_number }}</td>
                 <td>{{ reservation.start_time|date:"Y-m-d H:i" }}</td>
                 <td>{{ reservation.end_time|date:"Y-m-d H:i" }}</td>
+                <td>{{ reservation.spot.daily_price|floatformat:2 }} €</td>
                 <td>
-                    <!-- Button for cancelling reservation -->
                     <form method="POST" action="{% url 'unreserve_parking_spot' reservation.id %}">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-danger">Cancel Reservation</button>
                     </form>
+                </td>
+                <td>
+                    {% if not reservation.is_paid %}
+                        <form method="POST" action="{% url 'checkout' reservation.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">Checkout</button>
+                        </form>
+                    {% else %}
+                        <p>Paid</p>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -118,10 +218,43 @@
         <p>You have no current reservations.</p>
     {% endif %}
 
+    <h3>Your Past Reservations</h3>
+
+    {% if past_reservations %}
+        <table>
+            <tr>
+                <th>Spot Number</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Daily Price (€)</th>
+                <th>Payment</th>
+            </tr>
+            {% for reservation in past_reservations %}
+            <tr>
+                <td>{{ reservation.spot.spot_number }}</td>
+                <td>{{ reservation.start_time|date:"Y-m-d H:i" }}</td>
+                <td>{{ reservation.end_time|date:"Y-m-d H:i" }}</td>
+                <td>{{ reservation.spot.daily_price|floatformat:2 }} €</td>
+                <td>
+                    {% if reservation.is_paid %}
+                        <p>Paid</p>
+                    {% else %}
+                        <p>Not Paid</p>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>You have no past reservations.</p>
+    {% endif %}
+
     <button><a href="{% url 'parking_spots' %}">View Available Parking Spots</a></button>
 
     <br><br>
-    <button type="button" class="btn btn-dark"><a href="{% url 'logout' %}">Logout</a></button>
+    <!-- Fixed Logout Button -->
+    <div class="btn-logout">
+        <a href="{% url 'logout' %}">Logout</a>
+    </div>
 </body>
-
 </html>

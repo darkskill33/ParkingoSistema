@@ -129,3 +129,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = '/'  # Redirect to home page after login
 LOGOUT_REDIRECT_URL = '/login/'  # Redirect to login page after logout
 
+STRIPE_PUBLIC_KEY = 'pk_test_51QObpDFfF3NwylgrLOFhqeADT49W95jfcJR6jPx0MIJgyfylBzAAOX3UViIpGRA6OK2EICdtvwqE74AfafEnaT6500QSa5FP6m'
+STRIPE_SECRET_KEY = 'sk_test_51QObpDFfF3Nwylgreo55vR0Rx6GfUbaxLiievwTnb8QIqdewJn1iyCHBnMvDqPALlKPrCuEmI7xxRFdfPgNJRBwn00ateCUTss'

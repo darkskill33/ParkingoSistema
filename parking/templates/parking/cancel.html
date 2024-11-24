@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Canceled</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        h2 {
+            color: #FF6347;  /* Tomato color for cancellation */
+        }
+
+        p {
+            font-size: 16px;
+            color: #666;
+            margin-top: 20px;
+        }
+
+        button, a {
+            padding: 12px 20px;
+            margin: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover, a:hover {
+            background-color: #45a049;
+        }
+
+    </style>
+</head>
+<body>
+    <h2>Payment Canceled</h2>
+    <p>Your payment was not processed. Please try again.</p>
+    <a href="{% url 'profile' %}">Back to Profile</a>
+</body>
+</html>

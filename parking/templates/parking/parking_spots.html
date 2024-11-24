@@ -77,12 +77,23 @@
             text-transform: capitalize;
         }
 
+        .reserved {
+            color: red;
+        }
+
+        .available {
+            color: green;
+        }
+
+        .next-available {
+            font-weight: bold;
+            color: #ff9900;
+        }
     </style>
 </head>
 <body>
-
     <h2>Available Parking Locations and Spots</h2>
-
+    
     {% for location in locations %}
         <div style="width: 80%; background-color: white; margin-bottom: 20px; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
             <h3>{{ location.name }}</h3>
@@ -92,33 +103,50 @@
                 <tr>
                     <th>Spot Number</th>
                     <th>Status</th>
+                    <th>Daily Price (€)</th>  
+                    <th>Next Available</th> <!-- Display next available date -->
                     <th>Action</th>
                 </tr>
                 {% for spot in location.spots.all %}
-                <tr>
-                    <td>{{ spot.spot_number }}</td>
-                    <td>
-                        {% if spot.is_reserved %}
-                            Reserved
-                        {% else %}
-                            Available
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if not spot.is_reserved %}
-                            <!-- Pass the spot_id in the URL -->
-                            <a href="{% url 'reserve_parking_spot' spot.id %}">Reserve</a>
-                        {% else %}
-                            Unavailable
-                        {% endif %}
-                    </td>
-                </tr>
+                    {% if spot.is_approved %}
+                        <tr>
+                            <td>{{ spot.spot_number }}</td>
+                            <td>
+                                {% if spot.is_reserved %}
+                                    <span class="reserved">Reserved</span>
+                                {% else %}
+                                    <span class="available">Available</span>
+                                {% endif %}
+                            </td>                       
+                            <td>{{ spot.daily_price|floatformat:2 }} €</td>
+                            <td>
+                                {% if spot.current_reservation %}
+                                    <span class="next-available">{{ spot.current_reservation.end_time|date:"Y-m-d H:i" }}</span>
+                                {% elif spot.next_reservation %}
+                                    <span class="next-available">{{ spot.next_reservation.start_time|date:"Y-m-d H:i" }}</span>
+                                {% else %}
+                                    <span class="next-available">Now</span>
+                                {% endif %}
+                            </td>
+                            
+                            <td>
+                                {% if spot.current_reservation %}
+                                    <span class="reserved">Unavailable</span>
+                                {% else %}
+                                    <a href="{% url 'reserve_parking_spot' spot.id %}">Reserve</a>
+                                {% endif %}
+                            </td>
+                            
+                        </tr>
+                    {% endif %}
                 {% endfor %}
             </table>
         </div>
     {% endfor %}
 
-    <button><a href="{% url 'profile' %}">Back to Profile</a></button>
-
+    <div style="margin-top: 20px;">
+        <button><a href="{% url 'profile' %}">Back to Profile</a></button>
+        <button><a href="{% url 'add_parking_spot' %}">Add a Parking Spot</a></button>
+    </div>
 </body>
 </html>

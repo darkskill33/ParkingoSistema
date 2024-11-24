@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from parking.models import Reservation
+from django.utils import timezone
 
 def register(request):
     if request.method == "POST":
@@ -46,10 +47,15 @@ def logout_view(request):
     messages.success(request, "Logged out successfully!")
     return redirect('login')
 
-@login_required
 def profile_view(request):
-    # Ensure the session is refreshed
-    request.session.modified = True
     user = request.user
-    reservations = Reservation.objects.filter(user=user)  
-    return render(request, 'users/profile.html', {'user': user, 'reservations': reservations})
+    current_reservations = Reservation.objects.filter(user=user, end_time__gte=timezone.now())
+    past_reservations = Reservation.objects.filter(user=user, end_time__lt=timezone.now())  # Historical reservations
+    
+    return render(request, 'users/profile.html', {
+        'user': user,
+        'current_reservations': current_reservations,
+        'past_reservations': past_reservations  # Pass the past reservations to the template
+    })
+    
+    

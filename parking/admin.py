@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import ParkingLocation, ParkingSpot, Reservation
-from .forms import ReservationForm
 
 @admin.register(ParkingLocation)
 class ParkingLocationAdmin(admin.ModelAdmin):
@@ -10,18 +9,26 @@ class ParkingLocationAdmin(admin.ModelAdmin):
 @admin.register(ParkingSpot)
 class ParkingSpotAdmin(admin.ModelAdmin):
     list_display = ('spot_number', 'location', 'is_reserved')
-    list_filter = ('is_reserved', 'location')
+    list_filter = ('is_reserved', 'location', 'is_approved')
     search_fields = ('spot_number', 'location__name')
+    actions = ['approve_spots']
 
+    def approve_spots(self, request, queryset):
+        queryset.update(is_approved=True)
+        self.message_user(request, "Selected spots have been approved.")
+    approve_spots.short_description = "Approve selected spots"
 
-# admin.py
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'spot', 'start_time', 'end_time', 'duration_in_days')
+    list_display = ('user', 'spot', 'start_time', 'end_time', 'get_duration')
     search_fields = ('user__username', 'spot__spot_number')
-    
-    # Ensure the user is automatically set if not provided by the admin
+
+    def get_duration(self, obj):
+        """Display the duration of the reservation in days."""
+        return obj.duration  # Calls the `duration` property in the model
+    get_duration.short_description = 'Duration (days)'  # Label for the admin column
+
     def save_model(self, request, obj, form, change):
-        if not obj.user:  # If no user is set, set it to the currently logged-in admin
+        if not obj.user:
             obj.user = request.user
         super().save_model(request, obj, form, change)

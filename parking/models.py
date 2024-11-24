@@ -1,38 +1,70 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils.timezone import now
 from datetime import timedelta
 
 class Reservation(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Link reservation to a user
-    spot = models.ForeignKey('ParkingSpot', on_delete=models.CASCADE)  # Use a string reference here
-    duration_in_days = models.PositiveIntegerField()  # Duration of the reservation in days
-    start_time = models.DateTimeField()  # When reservation starts
-    end_time = models.DateTimeField()  # When reservation ends
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    spot = models.ForeignKey('ParkingSpot', on_delete=models.CASCADE, related_name="reservations")
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    is_paid = models.BooleanField(default=False)  # Track payment status
 
     def __str__(self):
         return f"Reservation for {self.user.username} at spot {self.spot.spot_number} from {self.start_time} to {self.end_time}"
-    
+
+    @property
+    def duration(self):
+        """Calculate the reservation duration in days."""
+        return (self.end_time - self.start_time).days + 1
+
     def delete(self, *args, **kwargs):
-        # Set the parking spot's is_reserved to False before deleting the reservation
-        self.spot.is_reserved = False
-        self.spot.save()
+        # Free the spot on reservation deletion
+        if not self.spot.reservations.filter(end_time__gte=now()).exists():
+            self.spot.is_reserved = False
+            self.spot.save()
         super().delete(*args, **kwargs)
 
 class ParkingLocation(models.Model):
-    name = models.CharField(max_length=100)  # Name of the parking location (e.g., "Main Street Garage")
-    address = models.CharField(max_length=200, blank=True)  # Optional address
+    name = models.CharField(max_length=100)
+    address = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
         return self.name
 
 class ParkingSpot(models.Model):
-    location = models.ForeignKey(ParkingLocation, on_delete=models.CASCADE, related_name="spots")
-    spot_number = models.CharField(max_length=10)  # Spot identifier (e.g., "A1", "B2")
-    is_reserved = models.BooleanField(default=False)  # Whether the spot is reserved
+    location = models.ForeignKey(
+        'ParkingLocation',
+        on_delete=models.CASCADE,
+        related_name="spots"
+    )
+    spot_number = models.CharField(max_length=10)
+    is_reserved = models.BooleanField(default=False)
+    is_rentable = models.BooleanField(default=False)
+    daily_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True
+    )
+    owner = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='owned_spots'
+    )
+    is_approved = models.BooleanField(default=False)
+
+    def is_available(self, start_time, end_time):
+        """Check if the parking spot is available for a given time period."""
+        return not self.reservations.filter(
+            start_time__lt=end_time, end_time__gt=start_time
+        ).exists()
 
     def reserve(self, user, start_time, end_time):
-        """Reserve this parking spot."""
-        if not self.is_reserved:
+        """Reserve a parking spot if available."""
+        if self.is_available(start_time, end_time) and self.is_approved:
             reservation = Reservation.objects.create(
                 user=user,
                 spot=self,
@@ -44,10 +76,13 @@ class ParkingSpot(models.Model):
             return reservation
         return None
 
-    def release(self):
-        """Release this parking spot."""
-        self.is_reserved = False
-        self.save()
+    def release_if_expired(self):
+        """Release the parking spot if no ongoing or future reservations exist."""
+        if not self.reservations.filter(end_time__gte=now()).exists():
+            self.is_reserved = False
+            self.save()
 
     def __str__(self):
-        return f"Spot {self.spot_number} at {self.location.name}"
+        rentable_status = " (Rentable)" if self.is_rentable else ""
+        approval_status = " (Approved)" if self.is_approved else " (Pending Approval)"
+        return f"Spot {self.spot_number} at {self.location.name}{rentable_status}{approval_status}"
