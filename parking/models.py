@@ -7,8 +7,8 @@ from datetime import timedelta
 class Reservation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     spot = models.ForeignKey('ParkingSpot', on_delete=models.CASCADE, related_name="reservations")
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
+    start_time = models.DateField()
+    end_time = models.DateField()
     is_paid = models.BooleanField(default=False)  # Track payment status
 
     def __str__(self):

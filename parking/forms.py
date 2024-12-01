@@ -6,8 +6,16 @@ from .models import ParkingLocation, Reservation, ParkingSpot
 from .models import Review
 
 class UserReservationForm(forms.ModelForm):
-    start_time = forms.DateTimeField(initial=timezone.now)
-    end_time = forms.DateTimeField(label="End Date", required=True)
+    start_time = forms.DateField(
+        initial=timezone.now().date(),  # Set the initial value to the current date
+        widget=forms.DateInput(attrs={'type': 'date'}),  
+        label="Start Date", 
+    )
+    end_time = forms.DateField(
+        label="End Date",
+        required=True,
+        widget=forms.DateInput(attrs={'type': 'date'}),  
+    )
     user = forms.ModelChoiceField(queryset=User.objects.all(), required=False)  # Hidden or prefilled
     spot = forms.ModelChoiceField(queryset=ParkingSpot.objects.all(), required=False)  # Hidden or prefilled
 
@@ -25,7 +33,7 @@ class UserReservationForm(forms.ModelForm):
             # Calculate the duration in days
             duration_in_days = (end_time - start_time).days
             # If the duration is zero or negative, raise an error
-            if duration_in_days < 1:
+            if duration_in_days < 0:
                 raise forms.ValidationError("The end time must be later than the start time.")
             cleaned_data['duration_in_days'] = duration_in_days
 

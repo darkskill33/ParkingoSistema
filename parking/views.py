@@ -9,81 +9,92 @@ import stripe
 from django.conf import settings
 
 def parking_spots_view(request):
+    location_filter = request.GET.get('location_filter', 'Old Town Parking')  # Default to 'Old Town Parking'
+    
     locations = ParkingLocation.objects.prefetch_related('spots').all()
-    now = timezone.now()  # Get the current time
+    today = timezone.now().date()  # Get the current date
 
-    # Filter locations to only include those with approved spots
+    # Apply location filter if it's not 'All Locations'
+    if location_filter != 'All Locations':
+        locations = locations.filter(name=location_filter)
+
     locations_with_approved_spots = []
     for location in locations:
-        # Filter approved spots for this location
         approved_spots = location.spots.filter(is_approved=True)
-        if approved_spots.exists():  # Only add locations with approved spots
-            # Add reservation details to each approved spot
+        if approved_spots.exists():
             for spot in approved_spots:
-                spot.is_reserved = spot.reservations.filter(start_time__lte=now, end_time__gte=now).exists()
-                spot.next_reservation = spot.reservations.filter(start_time__gt=now).order_by('start_time').first()
-                spot.current_reservation = spot.reservations.filter(start_time__lte=now, end_time__gte=now).first()
-            # Add the location with its approved spots
-            location.approved_spots = approved_spots  # Attach approved spots to the location
+                spot.is_reserved = spot.reservations.filter(
+                    start_time__lte=today, end_time__gte=today
+                ).exists()
+                spot.next_reservation = spot.reservations.filter(
+                    start_time__gt=today
+                ).order_by('start_time').first()
+                spot.current_reservation = spot.reservations.filter(
+                    start_time__lte=today, end_time__gte=today
+                ).first()
+            location.approved_spots = approved_spots
             locations_with_approved_spots.append(location)
 
     return render(
         request,
         'parking/parking_spots.html',
-        {'locations': locations_with_approved_spots, 'now': now}
+        {'locations': locations_with_approved_spots, 'today': today, 'location_filter': location_filter, 'all_locations': ParkingLocation.objects.all()}
     )
 
 
 def reserve_parking_spot(request, spot_id):
     spot = get_object_or_404(ParkingSpot, id=spot_id)
-    current_time = timezone.now()
-    latest_reservation = spot.reservations.filter(end_time__gte=current_time).order_by('start_time').first()
+    today = timezone.now().date()
+    latest_reservation = spot.reservations.filter(end_time__gte=today).order_by('start_time').first()
 
     if latest_reservation:
         spot_status = 'reserved'
-        next_free_time = latest_reservation.end_time
+        next_free_date = latest_reservation.end_time
     else:
         spot_status = 'available'
-        next_free_time = None
+        next_free_date = None
 
     if request.method == 'POST':
         form = UserReservationForm(request.POST)
-        
         if form.is_valid():
             reservation = form.save(commit=False)
             reservation.user = request.user
             reservation.spot = spot
-            reservation.payment_due_time = timezone.now() + timedelta(minutes=1)  # Set payment deadline
-            print(f"Payment due time set for reservation: {reservation.payment_due_time}")
-            print(f"Payment due time set for current time: {current_time}")
+            reservation.payment_due_time = timezone.now() + timedelta(minutes=5)
 
-            
-            # Validate reservation timing
-            if latest_reservation and reservation.start_time < latest_reservation.end_time:
-                messages.error(request, f"Spot {spot.spot_number} is reserved until {latest_reservation.end_time}.")
-            elif reservation.start_time < timezone.now():
-                messages.error(request, "Reservation start time cannot be in the past.")
+            if latest_reservation:
+                if reservation.start_time <= latest_reservation.end_time and reservation.end_time > latest_reservation.start_time:
+                    messages.error(
+                        request, f"Spot {spot.spot_number} is reserved until {latest_reservation.end_time}."
+                    )
+                elif reservation.start_time < today:
+                    messages.error(request, "Reservation start date cannot be in the past.")
+                else:
+                    reservation.save()
+                    messages.success(
+                        request,
+                        f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}. Please pay within 5 minutes."
+                    )
+                    return redirect('profile')
             else:
                 reservation.save()
-                messages.success(request, f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}. Please pay within 5 minutes.")
+                messages.success(
+                    request,
+                    f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}. Please pay within 5 minutes."
+                )
                 return redirect('profile')
         else:
-            # Debugging purposes
-            print(form.errors)
             messages.error(request, "There was an issue with the reservation details. Please check your input.")
-
     else:
-        form = UserReservationForm(initial={'start_time': timezone.now(), 'user': request.user, 'spot': spot})
+        form = UserReservationForm(initial={'start_time': today, 'user': request.user, 'spot': spot})
 
     return render(request, 'parking/reserve_spot_user.html', {
         'spot': spot,
         'form': form,
         'spot_status': spot_status,
-        'next_free_time': next_free_time
+        'next_free_date': next_free_date
     })
-
-
-
+    
 def unreserve_parking_spot(request, reservation_id):
     reservation = get_object_or_404(Reservation, id=reservation_id, user=request.user)
     reservation.delete()  # Automatically frees the spot
@@ -91,21 +102,12 @@ def unreserve_parking_spot(request, reservation_id):
     return redirect('profile')
 
 def free_expired_spots():
-    # Make sure to use timezone-aware comparison
     now = timezone.now()
     unpaid_reservations = Reservation.objects.filter(is_paid=False, payment_due_time__lte=now)
 
-    if not unpaid_reservations:
-        print("No unpaid reservations found.")
-    
     for reservation in unpaid_reservations:
-        print(f"Checking reservation for spot {reservation.spot.spot_number}, due time: {reservation.payment_due_time}")
-        
         if reservation.payment_due_time <= now:
-            print(f"Reservation for spot {reservation.spot.spot_number} has expired, canceling.")
-            reservation.delete()  # Automatically cancel the expired reservation
-        else:
-            print(f"Reservation for spot {reservation.spot.spot_number} is still valid.")
+            reservation.delete()
 
 
 @login_required
@@ -152,35 +154,29 @@ def checkout(request, reservation_id):
     reservation = get_object_or_404(Reservation, id=reservation_id, user=request.user)
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    # Ensure that the spot has a valid daily_price
     if reservation.spot.daily_price is None:
         messages.error(request, "This parking spot does not have a valid price set.")
         return redirect('profile')
 
-    # Calculate the duration in days
-    duration = reservation.end_time - reservation.start_time
-    duration_in_days = duration.days  # Get the number of full days
-
-    # Calculate the total price: spot's daily price * number of days
+    duration_in_days = (reservation.end_time - reservation.start_time).days + 1
     total_price = reservation.spot.daily_price * duration_in_days
 
     if request.method == 'POST':
-        # Create a payment intent with the calculated total_price
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
-                    'currency': 'eur', 
+                    'currency': 'eur',
                     'product_data': {
                         'name': f"Reservation for Spot {reservation.spot.spot_number}",
                     },
-                    'unit_amount': int(total_price * 100),  # Stripe expects the amount in cents
+                    'unit_amount': int(total_price * 100),
                 },
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=f'http://127.0.0.1:8000/parking/success?reservation_id={reservation.id}', 
-            cancel_url='http://127.0.0.1:8000/parking/cancel', 
+            success_url=f'http://127.0.0.1:8000/parking/success?reservation_id={reservation.id}',
+            cancel_url='http://127.0.0.1:8000/parking/cancel',
         )
         return redirect(session.url, code=303)
 
