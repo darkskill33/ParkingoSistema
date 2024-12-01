@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from datetime import timedelta
 from .models import ParkingLocation, Reservation, ParkingSpot
+from .models import Review
 
 class UserReservationForm(forms.ModelForm):
     start_time = forms.DateTimeField(initial=timezone.now)
@@ -47,6 +48,12 @@ class ParkingSpotForm(forms.ModelForm):
         label="New Location Name",
         help_text="Fill this to create a new parking location"
     )
+    new_location_address = forms.CharField(
+        max_length=255, 
+        required=False, 
+        label="New Location Address",
+        help_text="Fill this to add the address of the new location"
+    )
 
     class Meta:
         model = ParkingSpot
@@ -56,16 +63,25 @@ class ParkingSpotForm(forms.ModelForm):
         }
 
     def clean_location(self):
-        # Handle "new" location creation
         location = self.cleaned_data.get('location')
         new_location_name = self.cleaned_data.get('new_location_name')
+        new_location_address = self.cleaned_data.get('new_location_address')
 
         if location and new_location_name:
             raise forms.ValidationError("Please choose either an existing location or provide a new location name.")
         
         if not location and new_location_name:
-            # Create new location if needed
+            # Create new location if needed and include the address
             location, created = ParkingLocation.objects.get_or_create(name=new_location_name)
+            if created and new_location_address:
+                location.address = new_location_address
+                location.save()  # Save the address to the newly created location
             return location
         
         return location
+ 
+
+class ReviewForm(forms.ModelForm):
+    class Meta:
+        model = Review
+        fields = ['rating', 'comment']

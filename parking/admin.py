@@ -3,12 +3,15 @@ from .models import ParkingLocation, ParkingSpot, Reservation
 
 @admin.register(ParkingLocation)
 class ParkingLocationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'address')
+    list_display = ('name', 'address', 'latitude', 'longitude')  # Add latitude and longitude here if you want them displayed in the list
     search_fields = ('name', 'address')
-
+    fields = ('name', 'address', 'latitude', 'longitude')  # Include latitude and longitude in the form
+    ordering = ('name',)
+    
+    
 @admin.register(ParkingSpot)
 class ParkingSpotAdmin(admin.ModelAdmin):
-    list_display = ('spot_number', 'location', 'is_reserved')
+    list_display = ('spot_number', 'location', 'is_approved')
     list_filter = ('is_reserved', 'location', 'is_approved')
     search_fields = ('spot_number', 'location__name')
     actions = ['approve_spots']

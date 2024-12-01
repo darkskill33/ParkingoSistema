@@ -35,11 +35,12 @@ def login_view(request):
         if user is not None:
             login(request, user)
             messages.success(request, "You have successfully logged in!")
-            return render(request, 'users/profile.html', {'name': user.first_name})
+            return redirect('profile')  # Redirect to the profile view
         else:
             messages.error(request, "Bad credentials!")
     
     return render(request, 'users/login.html')
+
 
 
 def logout_view(request):
@@ -49,13 +50,14 @@ def logout_view(request):
 
 def profile_view(request):
     user = request.user
-    current_reservations = Reservation.objects.filter(user=user, end_time__gte=timezone.now())
-    past_reservations = Reservation.objects.filter(user=user, end_time__lt=timezone.now())  # Historical reservations
-    
+    current_reservations = Reservation.objects.filter(user=user, end_time__gte=timezone.now()).using('default')
+    past_reservations = Reservation.objects.filter(user=user, end_time__lt=timezone.now()).using('default')
+
     return render(request, 'users/profile.html', {
         'user': user,
         'current_reservations': current_reservations,
-        'past_reservations': past_reservations  # Pass the past reservations to the template
+        'past_reservations': past_reservations
     })
+
     
     

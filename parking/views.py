@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import ParkingLocation, ParkingSpot, Reservation
-from .forms import UserReservationForm, ParkingSpotForm
+from .models import ParkingLocation, ParkingSpot, Reservation, Review
+from .forms import UserReservationForm, ParkingSpotForm, ReviewForm
 from django.contrib import messages
 from datetime import timedelta
 from django.utils import timezone
@@ -10,27 +10,35 @@ from django.conf import settings
 
 def parking_spots_view(request):
     locations = ParkingLocation.objects.prefetch_related('spots').all()
-    approved_spots = ParkingSpot.objects.filter(is_approved=True)
-    
     now = timezone.now()  # Get the current time
 
-    # Add the current reservation status for each spot in locations
+    # Filter locations to only include those with approved spots
+    locations_with_approved_spots = []
     for location in locations:
-        for spot in location.spots.all():
-            spot.is_reserved = spot.reservations.filter(start_time__lte=now, end_time__gte=now).exists()
-            spot.next_reservation = spot.reservations.filter(start_time__gt=now).order_by('start_time').first()
-            spot.current_reservation = spot.reservations.filter(start_time__lte=now, end_time__gte=now).first()
+        # Filter approved spots for this location
+        approved_spots = location.spots.filter(is_approved=True)
+        if approved_spots.exists():  # Only add locations with approved spots
+            # Add reservation details to each approved spot
+            for spot in approved_spots:
+                spot.is_reserved = spot.reservations.filter(start_time__lte=now, end_time__gte=now).exists()
+                spot.next_reservation = spot.reservations.filter(start_time__gt=now).order_by('start_time').first()
+                spot.current_reservation = spot.reservations.filter(start_time__lte=now, end_time__gte=now).first()
+            # Add the location with its approved spots
+            location.approved_spots = approved_spots  # Attach approved spots to the location
+            locations_with_approved_spots.append(location)
 
-    return render(request, 'parking/parking_spots.html', {'locations': locations, 'approved_spots': approved_spots, 'now': now})
+    return render(
+        request,
+        'parking/parking_spots.html',
+        {'locations': locations_with_approved_spots, 'now': now}
+    )
 
 
 def reserve_parking_spot(request, spot_id):
     spot = get_object_or_404(ParkingSpot, id=spot_id)
-    
     current_time = timezone.now()
     latest_reservation = spot.reservations.filter(end_time__gte=current_time).order_by('start_time').first()
 
-    # If the spot is currently reserved, calculate when it will be free
     if latest_reservation:
         spot_status = 'reserved'
         next_free_time = latest_reservation.end_time
@@ -42,21 +50,29 @@ def reserve_parking_spot(request, spot_id):
         form = UserReservationForm(request.POST)
         
         if form.is_valid():
-            # Now that form is valid, just save it and pass the data to create a reservation
             reservation = form.save(commit=False)
-            reservation.user = request.user  # Set the logged-in user (or pass user explicitly in the form)
-            reservation.spot = spot  # Assign the spot (if not prefilled)
-            reservation.save()  # Save the reservation object
-            messages.success(request, f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}.")
-            return redirect('profile')  # Or wherever you'd like to redirect after success
+            reservation.user = request.user
+            reservation.spot = spot
+            reservation.payment_due_time = timezone.now() + timedelta(minutes=1)  # Set payment deadline
+            print(f"Payment due time set for reservation: {reservation.payment_due_time}")
+            print(f"Payment due time set for current time: {current_time}")
+
+            
+            # Validate reservation timing
+            if latest_reservation and reservation.start_time < latest_reservation.end_time:
+                messages.error(request, f"Spot {spot.spot_number} is reserved until {latest_reservation.end_time}.")
+            elif reservation.start_time < timezone.now():
+                messages.error(request, "Reservation start time cannot be in the past.")
+            else:
+                reservation.save()
+                messages.success(request, f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}. Please pay within 5 minutes.")
+                return redirect('profile')
         else:
-            # Print out the form errors to debug
-            print(form.errors)  # Log or print form errors to debug
+            # Debugging purposes
+            print(form.errors)
             messages.error(request, "There was an issue with the reservation details. Please check your input.")
-            print(request.POST)
 
     else:
-        # Pre-fill the form with the current user and spot
         form = UserReservationForm(initial={'start_time': timezone.now(), 'user': request.user, 'spot': spot})
 
     return render(request, 'parking/reserve_spot_user.html', {
@@ -67,6 +83,7 @@ def reserve_parking_spot(request, spot_id):
     })
 
 
+
 def unreserve_parking_spot(request, reservation_id):
     reservation = get_object_or_404(Reservation, id=reservation_id, user=request.user)
     reservation.delete()  # Automatically frees the spot
@@ -74,21 +91,37 @@ def unreserve_parking_spot(request, reservation_id):
     return redirect('profile')
 
 def free_expired_spots():
-    """Periodic task to free expired spots."""
-    for spot in ParkingSpot.objects.all():
-        spot.release_if_expired()
+    # Make sure to use timezone-aware comparison
+    now = timezone.now()
+    unpaid_reservations = Reservation.objects.filter(is_paid=False, payment_due_time__lte=now)
+
+    if not unpaid_reservations:
+        print("No unpaid reservations found.")
+    
+    for reservation in unpaid_reservations:
+        print(f"Checking reservation for spot {reservation.spot.spot_number}, due time: {reservation.payment_due_time}")
+        
+        if reservation.payment_due_time <= now:
+            print(f"Reservation for spot {reservation.spot.spot_number} has expired, canceling.")
+            reservation.delete()  # Automatically cancel the expired reservation
+        else:
+            print(f"Reservation for spot {reservation.spot.spot_number} is still valid.")
 
 
 @login_required
 def add_parking_spot(request):
     if request.method == 'POST':
-        # Handle form submission
         location_name = request.POST.get('new_location_name')  # Get the new location name if provided
+        location_address = request.POST.get('new_location_address')  # Get the new location address if provided
         location_id = request.POST.get('location')  # Get the selected location id
         
         # If a new location is provided, create it
         if location_name:
-            location = ParkingLocation.objects.create(name=location_name)
+            # Create a new location with the provided name and address
+            location = ParkingLocation.objects.create(
+                name=location_name,
+                address=location_address  # Save the address if provided
+            )
         else:
             # Else, get the existing location by id
             location = ParkingLocation.objects.get(id=location_id)
@@ -97,6 +130,7 @@ def add_parking_spot(request):
         spot_number = request.POST['spot_number']
         daily_price = request.POST['daily_price']
         
+        # Create the parking spot
         spot = ParkingSpot.objects.create(
             location=location,
             spot_number=spot_number,
@@ -121,7 +155,7 @@ def checkout(request, reservation_id):
     # Ensure that the spot has a valid daily_price
     if reservation.spot.daily_price is None:
         messages.error(request, "This parking spot does not have a valid price set.")
-        return redirect('profile')  # Redirect to profile if price is not set
+        return redirect('profile')
 
     # Calculate the duration in days
     duration = reservation.end_time - reservation.start_time
@@ -136,7 +170,7 @@ def checkout(request, reservation_id):
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
-                    'currency': 'usd',  # Change to EUR or any currency you need
+                    'currency': 'eur', 
                     'product_data': {
                         'name': f"Reservation for Spot {reservation.spot.spot_number}",
                     },
@@ -145,8 +179,8 @@ def checkout(request, reservation_id):
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=f'http://127.0.0.1:8000/parking/success?reservation_id={reservation.id}',  # Full URL
-            cancel_url='http://127.0.0.1:8000/parking/cancel',  # Full URL
+            success_url=f'http://127.0.0.1:8000/parking/success?reservation_id={reservation.id}', 
+            cancel_url='http://127.0.0.1:8000/parking/cancel', 
         )
         return redirect(session.url, code=303)
 
@@ -168,3 +202,23 @@ def cancel(request):
     return render(request, 'parking/cancel.html')
 
 
+def parking_location_profile(request, location_id):
+    location = get_object_or_404(ParkingLocation, id=location_id)
+    reviews = Review.objects.filter(location=location)  # Get all reviews for this location
+
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.location = location
+            review.user = request.user
+            review.save()
+            return redirect('parking_location_profile', location_id=location.id)
+    else:
+        form = ReviewForm()
+
+    return render(request, 'parking/parking_locations_profile.html', {
+        'location': location,
+        'form': form,
+        'reviews': reviews,  # Pass reviews to the template
+    })

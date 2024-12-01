@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ location.name }} - Parking Location</title>
+    <style>
+        /* Basic page styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        /* Map container styling */
+        #map {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* Review Section */
+        .review-container {
+            margin-top: 20px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .review-container h3 {
+            font-size: 1.8rem;
+            color: #4CAF50;
+        }
+
+        .review {
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0;
+            margin-bottom: 15px;
+        }
+
+        .review h4 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .review p {
+            font-size: 1rem;
+            line-height: 1.4;
+            color: #555;
+        }
+
+        .review-empty {
+            font-size: 1.1rem;
+            font-style: italic;
+            color: #777;
+        }
+
+        /* Form Section */
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        form input[type="text"], form textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        form button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        form button:hover {
+            background-color: #45a049;
+        }
+
+        /* Back button styling and centering */
+        .back-button-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .back-button {
+            background-color: #4CAF50;
+            color: #333;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: white;
+            font-size: 1rem;
+            display: inline-block;
+            transition: background-color 0.3s ease;
+        }
+
+        .back-button:hover {
+            background-color: #ddd;
+        }
+
+    </style>
+    <!-- Leaflet.js (OpenStreetMap) CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <header>
+        <h2>{{ location.name }} - Parking Location</h2>
+        <p>{{ location.address }}</p>
+    </header>
+
+    <!-- Display the map -->
+    <div id="map"></div>
+
+    <script>
+        // Create a map centered at the parking location's coordinates
+        var map = L.map('map').setView([{{ location.latitude }}, {{ location.longitude }}], 14);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add a marker at the parking location
+        var marker = L.marker([{{ location.latitude }}, {{ location.longitude }}]).addTo(map)
+            .bindPopup("{{ location.name }}")
+            .openPopup();
+    </script>
+
+    <!-- User Reviews Section -->
+    <div class="review-container">
+        <h3>User Reviews</h3>
+        <div>
+            {% for review in location.reviews.all %}
+                <div class="review">
+                    <h4>{{ review.user.username }} - Rating: {{ review.rating }}/5</h4>
+                    <p>{{ review.comment }}</p>
+                </div>
+            {% empty %}
+                <p class="review-empty">No reviews yet. Be the first to add one!</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Add a Review Form Section -->
+    <div class="review-container">
+        <h4>Add a Review</h4>
+        <form method="POST">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Submit Review</button>
+        </form>
+    </div>
+
+    <!-- Back to Parking Spots Button -->
+    <div class="back-button-container">
+        <a href="{% url 'parking_spots' %}" class="back-button">Back to Available Parking Spots</a>
+    </div>
+
+</body>
+</html>

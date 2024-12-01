@@ -10,4 +10,5 @@ urlpatterns = [
     path('checkout/<int:reservation_id>/', views.checkout, name='checkout'),
     path('success/', views.success, name='success'),
     path('cancel/', views.cancel, name='cancel'),
+    path('location/<int:location_id>/', views.parking_location_profile, name='parking_location_profile'),
 ]
