@@ -183,8 +183,8 @@
         <table border="1" cellspacing="0" cellpadding="5" style="width: 100%; text-align: left;">
             <tr>
                 <th>Spot Number</th>
-                <th>Start Date</th>  <!-- Change "Start Time" to "Start Date" -->
-                <th>End Date</th>    <!-- Change "End Time" to "End Date" -->
+                <th>Start Date</th>  
+                <th>End Date</th>    
                 <th>Daily Price (€)</th>
                 <th>Actions</th>
                 <th>Payment</th>
@@ -192,8 +192,8 @@
             {% for reservation in current_reservations %}
             <tr>
                 <td>{{ reservation.spot.spot_number }}</td>
-                <td>{{ reservation.start_time|date:"Y-m-d" }}</td>  <!-- Use only date-related format specifiers -->
-                <td>{{ reservation.end_time|date:"Y-m-d" }}</td>    <!-- Use only date-related format specifiers -->
+                <td>{{ reservation.start_time|date:"Y-m-d" }}</td>  
+                <td>{{ reservation.end_time|date:"Y-m-d" }}</td>    
                 <td>{{ reservation.spot.daily_price|floatformat:2 }} €</td>
                 <td>
                     <form method="POST" action="{% url 'unreserve_parking_spot' reservation.id %}">
@@ -223,16 +223,16 @@
         <table border="1" cellspacing="0" cellpadding="5" style="width: 100%; text-align: left;">
             <tr>
                 <th>Spot Number</th>
-                <th>Start Date</th>  <!-- Change "Start Time" to "Start Date" -->
-                <th>End Date</th>    <!-- Change "End Time" to "End Date" -->
+                <th>Start Date</th>  
+                <th>End Date</th>    
                 <th>Daily Price (€)</th>
                 <th>Payment</th>
             </tr>
             {% for reservation in past_reservations %}
             <tr>
                 <td>{{ reservation.spot.spot_number }}</td>
-                <td>{{ reservation.start_time|date:"Y-m-d" }}</td>  <!-- Use only date-related format specifiers -->
-                <td>{{ reservation.end_time|date:"Y-m-d" }}</td>    <!-- Use only date-related format specifiers -->
+                <td>{{ reservation.start_time|date:"Y-m-d" }}</td>  
+                <td>{{ reservation.end_time|date:"Y-m-d" }}</td>    
                 <td>{{ reservation.spot.daily_price|floatformat:2 }} €</td>
                 <td>
                     {% if reservation.is_paid %}

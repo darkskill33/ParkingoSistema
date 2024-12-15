@@ -16,8 +16,10 @@ class Reservation(models.Model):
 
     @property
     def duration(self):
-        """Calculate the reservation duration in days."""
-        return (self.end_time - self.start_time).days + 1
+        if self.start_time and self.end_time:  # Ensure both dates are set
+            return (self.end_time - self.start_time).days + 1
+        return None  # Return None if either date is missing
+
 
     def delete(self, *args, **kwargs):
         # Free the spot on reservation deletion
@@ -27,7 +29,6 @@ class Reservation(models.Model):
         super().delete(*args, **kwargs)
         
     def check_payment_due(self):
-        """Check if the reservation should be canceled due to payment timeout."""
         if not self.is_paid and self.payment_due_time and timezone.now() > self.payment_due_time:
             self.delete()  # Cancel reservation if payment is overdue
 

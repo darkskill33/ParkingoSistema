@@ -8,40 +8,44 @@ from django.contrib.auth.decorators import login_required
 import stripe
 from django.conf import settings
 
+@login_required
 def parking_spots_view(request):
-    location_filter = request.GET.get('location_filter', 'Old Town Parking')  # Default to 'Old Town Parking'
-    
-    locations = ParkingLocation.objects.prefetch_related('spots').all()
-    today = timezone.now().date()  # Get the current date
+    location_filter = request.GET.get('location_filter', 'All Locations')  # Default to 'All Locations'
+    today = timezone.now().date()
 
-    # Apply location filter if it's not 'All Locations'
+    locations_with_approved_spots = ParkingLocation.objects.filter(
+        spots__is_approved=True 
+    ).distinct().prefetch_related('spots')
+
     if location_filter != 'All Locations':
-        locations = locations.filter(name=location_filter)
+        locations_with_approved_spots = locations_with_approved_spots.filter(name=location_filter)
 
-    locations_with_approved_spots = []
-    for location in locations:
+    for location in locations_with_approved_spots:
         approved_spots = location.spots.filter(is_approved=True)
-        if approved_spots.exists():
-            for spot in approved_spots:
-                spot.is_reserved = spot.reservations.filter(
-                    start_time__lte=today, end_time__gte=today
-                ).exists()
-                spot.next_reservation = spot.reservations.filter(
-                    start_time__gt=today
-                ).order_by('start_time').first()
-                spot.current_reservation = spot.reservations.filter(
-                    start_time__lte=today, end_time__gte=today
-                ).first()
-            location.approved_spots = approved_spots
-            locations_with_approved_spots.append(location)
+        for spot in approved_spots:
+            spot.is_reserved = spot.reservations.filter(
+                start_time__lte=today, end_time__gte=today
+            ).exists()
+            spot.next_reservation = spot.reservations.filter(
+                start_time__gt=today
+            ).order_by('start_time').first()
+            spot.current_reservation = spot.reservations.filter(
+                start_time__lte=today, end_time__gte=today
+            ).first()
+        location.approved_spots = approved_spots
 
     return render(
         request,
         'parking/parking_spots.html',
-        {'locations': locations_with_approved_spots, 'today': today, 'location_filter': location_filter, 'all_locations': ParkingLocation.objects.all()}
+        {
+            'locations': locations_with_approved_spots,
+            'today': today,
+            'location_filter': location_filter,
+            'all_locations': locations_with_approved_spots  
+        }
     )
 
-
+@login_required
 def reserve_parking_spot(request, spot_id):
     spot = get_object_or_404(ParkingSpot, id=spot_id)
     today = timezone.now().date()
@@ -60,7 +64,7 @@ def reserve_parking_spot(request, spot_id):
             reservation = form.save(commit=False)
             reservation.user = request.user
             reservation.spot = spot
-            reservation.payment_due_time = timezone.now() + timedelta(minutes=5)
+            #reservation.payment_due_time = timezone.now() + timedelta(minutes=5)
 
             if latest_reservation:
                 if reservation.start_time <= latest_reservation.end_time and reservation.end_time > latest_reservation.start_time:
@@ -73,14 +77,14 @@ def reserve_parking_spot(request, spot_id):
                     reservation.save()
                     messages.success(
                         request,
-                        f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}. Please pay within 5 minutes."
+                        f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}."
                     )
                     return redirect('profile')
             else:
                 reservation.save()
                 messages.success(
                     request,
-                    f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}. Please pay within 5 minutes."
+                    f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}."
                 )
                 return redirect('profile')
         else:
@@ -95,6 +99,7 @@ def reserve_parking_spot(request, spot_id):
         'next_free_date': next_free_date
     })
     
+@login_required
 def unreserve_parking_spot(request, reservation_id):
     reservation = get_object_or_404(Reservation, id=reservation_id, user=request.user)
     reservation.delete()  # Automatically frees the spot
@@ -182,7 +187,7 @@ def checkout(request, reservation_id):
 
     return render(request, 'parking/checkout.html', {'reservation': reservation, 'total_price': total_price})
 
-
+@login_required
 def success(request):
     reservation_id = request.GET.get('reservation_id')  # Get reservation_id from query parameter
     if reservation_id:
@@ -197,7 +202,7 @@ def success(request):
 def cancel(request):
     return render(request, 'parking/cancel.html')
 
-
+@login_required
 def parking_location_profile(request, location_id):
     location = get_object_or_404(ParkingLocation, id=location_id)
     reviews = Review.objects.filter(location=location)  # Get all reviews for this location

@@ -28,8 +28,8 @@ class ReservationAdmin(admin.ModelAdmin):
 
     def get_duration(self, obj):
         """Display the duration of the reservation in days."""
-        return obj.duration  # Calls the `duration` property in the model
-    get_duration.short_description = 'Duration (days)'  # Label for the admin column
+        return obj.duration if obj.duration is not None else "N/A"  # Handle None gracefully
+    get_duration.short_description = 'Duration (days)' 
 
     def save_model(self, request, obj, form, change):
         if not obj.user:

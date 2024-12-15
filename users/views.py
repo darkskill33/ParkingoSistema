@@ -48,6 +48,7 @@ def logout_view(request):
     messages.success(request, "Logged out successfully!")
     return redirect('login')
 
+@login_required
 def profile_view(request):
     user = request.user
     current_reservations = Reservation.objects.filter(user=user, end_time__gte=timezone.now()).using('default')
