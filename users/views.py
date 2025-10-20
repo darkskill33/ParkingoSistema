@@ -8,25 +8,6 @@ from parking.models import Reservation
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
-def register(request):
-    if request.method == "POST":
-        username = request.POST['username']
-        password = request.POST['password']
-        name = request.POST['name']
-        lastname = request.POST['lastname']
-        email = request.POST['email']
-        
-    
-        if User.objects.filter(username=username).exists():
-            messages.error(request, "This username is already taken. Please choose a different one.")
-            return redirect('register')
-        
-        user = User.objects.create_user(username, email, password)
-        user.first_name = name
-        user.last_name = lastname
-        user.save()
-        return redirect('login')
-    return render(request, 'users/register.html')
 
 def create_user_account(username, email, password, first_name, last_name):
     """Pagalbinė funkcija vartotojo sukūrimui su patikrinimu."""
