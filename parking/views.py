@@ -46,49 +46,47 @@ def parking_spots_view(request):
     )
 
 @login_required
+@login_required
 def reserve_parking_spot(request, spot_id):
     spot = get_object_or_404(ParkingSpot, id=spot_id)
     today = timezone.now().date()
     latest_reservation = spot.reservations.filter(end_time__gte=today).order_by('start_time').first()
 
-    if latest_reservation:
-        spot_status = 'reserved'
-        next_free_date = latest_reservation.end_time
-    else:
-        spot_status = 'available'
-        next_free_date = None
+    spot_status = 'reserved' if latest_reservation else 'available'
+    next_free_date = latest_reservation.end_time if latest_reservation else None
 
     if request.method == 'POST':
         form = UserReservationForm(request.POST)
-        if form.is_valid():
-            reservation = form.save(commit=False)
-            reservation.user = request.user
-            reservation.spot = spot
-            #reservation.payment_due_time = timezone.now() + timedelta(minutes=5)
-
-            if latest_reservation:
-                if reservation.start_time <= latest_reservation.end_time and reservation.end_time > latest_reservation.start_time:
-                    messages.error(
-                        request, f"Spot {spot.spot_number} is reserved until {latest_reservation.end_time}."
-                    )
-                elif reservation.start_time < today:
-                    messages.error(request, "Reservation start date cannot be in the past.")
-                else:
-                    reservation.save()
-                    messages.success(
-                        request,
-                        f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}."
-                    )
-                    return redirect('profile')
-            else:
-                reservation.save()
-                messages.success(
-                    request,
-                    f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}."
-                )
-                return redirect('profile')
-        else:
+        if not form.is_valid():
             messages.error(request, "There was an issue with the reservation details. Please check your input.")
+            return render(request, 'parking/reserve_spot_user.html', {
+                'spot': spot,
+                'form': form,
+                'spot_status': spot_status,
+                'next_free_date': next_free_date
+            })
+
+        reservation = form.save(commit=False)
+        reservation.user = request.user
+        reservation.spot = spot
+
+        if reservation.start_time < today:
+            messages.error(request, "Reservation start date cannot be in the past.")
+        elif latest_reservation and (
+            reservation.start_time <= latest_reservation.end_time and
+            reservation.end_time > latest_reservation.start_time
+        ):
+            messages.error(
+                request, f"Spot {spot.spot_number} is reserved until {latest_reservation.end_time}."
+            )
+        else:
+            reservation.save()
+            messages.success(
+                request,
+                f"Spot {spot.spot_number} reserved from {reservation.start_time} to {reservation.end_time}."
+            )
+            return redirect('profile')
+
     else:
         form = UserReservationForm(initial={'start_time': today, 'user': request.user, 'spot': spot})
 
@@ -98,6 +96,7 @@ def reserve_parking_spot(request, spot_id):
         'spot_status': spot_status,
         'next_free_date': next_free_date
     })
+
     
 @login_required
 def unreserve_parking_spot(request, reservation_id):
