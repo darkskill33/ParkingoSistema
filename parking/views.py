@@ -46,7 +46,6 @@ def parking_spots_view(request):
     )
 
 @login_required
-@login_required
 def reserve_parking_spot(request, spot_id):
     spot = get_object_or_404(ParkingSpot, id=spot_id)
     today = timezone.now().date()
